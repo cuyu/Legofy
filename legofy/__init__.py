@@ -107,9 +107,10 @@ def apply_thumbnail_effects(image, palette, dither):
 def reduce_thumbnail_colors(image, color_number):
     """Reduce the color numbers using k-means clustering"""
     base_width, base_height = image.size
+    # image = image.convert('HSV')
     colors = []
-    for brick_x in range(base_width):
-        for brick_y in range(base_height):
+    for brick_y in range(base_height):
+        for brick_x in range(base_width):
             color = image.getpixel((brick_x, brick_y))
             colors.append(color)
     colors = float32(colors)
@@ -117,7 +118,7 @@ def reduce_thumbnail_colors(image, color_number):
     reduced_image = Image.new('RGB', image.size)
     reduced_colors = {}
     for i in range(color_number):
-        reduced_colors[i] = tuple([mean(colors[km_cluster.labels_ == i][:, j]) for j in range(4)])
+        reduced_colors[i] = tuple([mean(colors[km_cluster.labels_ == i][:, j]) for j in range(3)])
     reduced_pixels = []
     for label in km_cluster.labels_:
         reduced_pixels.append(reduced_colors[label])
@@ -201,7 +202,7 @@ def main(image_path, output_path=None, size=None,
         if output_path is None:
             output_path = get_new_filename(image_path, '.png')
         print("Static image detected, will now legofy to {0}".format(output_path))
-        legofy_image(base_image, brick_image, output_path, size, palette_mode, dither, reduce_colors=3)
+        legofy_image(base_image, brick_image, output_path, size, palette_mode, dither, reduce_colors=6)
 
     base_image.close()
     brick_image.close()
@@ -209,4 +210,5 @@ def main(image_path, output_path=None, size=None,
 
 
 if __name__ == '__main__':
+    # main('/Users/CYu/Downloads/recycling_1.jpg')
     main('/Users/CYu/Downloads/world-hands.png')
