@@ -118,7 +118,7 @@ def reduce_thumbnail_colors(image, color_number):
     reduced_image = Image.new('RGB', image.size)
     reduced_colors = {}
     for i in range(color_number):
-        reduced_colors[i] = tuple([mean(colors[km_cluster.labels_ == i][:, j]) for j in range(3)])
+        reduced_colors[i] = tuple([median(colors[km_cluster.labels_ == i][:, j]) for j in range(3)])
     reduced_pixels = []
     for label in km_cluster.labels_:
         reduced_pixels.append(reduced_colors[label])
@@ -202,7 +202,7 @@ def main(image_path, output_path=None, size=None,
         if output_path is None:
             output_path = get_new_filename(image_path, '.png')
         print("Static image detected, will now legofy to {0}".format(output_path))
-        legofy_image(base_image, brick_image, output_path, size, palette_mode, dither, reduce_colors=6)
+        legofy_image(base_image, brick_image, output_path, size, palette_mode, dither, reduce_colors)
 
     base_image.close()
     brick_image.close()
@@ -210,5 +210,5 @@ def main(image_path, output_path=None, size=None,
 
 
 if __name__ == '__main__':
-    # main('/Users/CYu/Downloads/recycling_1.jpg')
-    main('/Users/CYu/Downloads/world-hands.png')
+    main('/Users/CYu/Downloads/recycling_1.jpg', reduce_colors=3)
+    # main('/Users/CYu/Downloads/world-hands.png')
