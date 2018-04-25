@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
-
+from sklearn.cluster import KMeans
+from numpy import median, float32, mean
 from PIL import Image, ImageSequence
 import sys
 import os
@@ -22,12 +23,12 @@ def apply_color_overlay(image, color):
     g = channels[1].point(lambda color: overlay_effect(color, overlay_green))
     b = channels[2].point(lambda color: overlay_effect(color, overlay_blue))
 
-
     channels[0].paste(r)
     channels[1].paste(g)
     channels[2].paste(b)
 
     return Image.merge(image.mode, channels)
+
 
 def overlay_effect(color, overlay):
     '''Actual overlay effect function'''
@@ -37,6 +38,7 @@ def overlay_effect(color, overlay):
         return overlay + 100
     else:
         return overlay - 133 + color
+
 
 def make_lego_image(thumbnail_image, brick_image):
     '''Create a lego version of an image from an image'''
@@ -85,6 +87,7 @@ def get_new_size(base_image, brick_image, size=None):
 
     return new_size
 
+
 def get_lego_palette(palette_mode):
     '''Gets the palette for the specified lego palette mode'''
     legos = palettes.legos()
@@ -97,8 +100,30 @@ def apply_thumbnail_effects(image, palette, dither):
     palette_image = Image.new("P", (1, 1))
     palette_image.putpalette(palette)
     return image.im.convert("P",
-                        Image.FLOYDSTEINBERG if dither else Image.NONE,
-                        palette_image.im)
+                            Image.FLOYDSTEINBERG if dither else Image.NONE,
+                            palette_image.im)
+
+
+def reduce_thumbnail_colors(image, color_number):
+    """Reduce the color numbers using k-means clustering"""
+    base_width, base_height = image.size
+    colors = []
+    for brick_x in range(base_width):
+        for brick_y in range(base_height):
+            color = image.getpixel((brick_x, brick_y))
+            colors.append(color)
+    colors = float32(colors)
+    km_cluster = KMeans(n_clusters=color_number, max_iter=300, n_init=40, init='k-means++', n_jobs=-1).fit(colors)
+    reduced_image = Image.new('RGB', image.size)
+    reduced_colors = {}
+    for i in range(color_number):
+        reduced_colors[i] = tuple([mean(colors[km_cluster.labels_ == i][:, j]) for j in range(4)])
+    reduced_pixels = []
+    for label in km_cluster.labels_:
+        reduced_pixels.append(reduced_colors[label])
+    reduced_image.putdata(reduced_pixels)
+    return reduced_image
+
 
 def legofy_gif(base_image, brick_image, output_path, size, palette_mode, dither):
     '''Alternative function that legofies animated gifs, makes use of images2gif - uses numpy!'''
@@ -128,20 +153,24 @@ def legofy_gif(base_image, brick_image, output_path, size, palette_mode, dither)
         frames_converted.append(new_frame)
 
     # Make use of images to gif function
-    images2gif.writeGif(output_path, frames_converted, duration=original_duration/1000.0, dither=0, subRectangles=False)
+    images2gif.writeGif(output_path, frames_converted, duration=original_duration / 1000.0, dither=0,
+                        subRectangles=False)
 
-def legofy_image(base_image, brick_image, output_path, size, palette_mode, dither):
+
+def legofy_image(base_image, brick_image, output_path, size, palette_mode, dither, reduce_colors):
     '''Legofy an image'''
     new_size = get_new_size(base_image, brick_image, size)
     base_image.thumbnail(new_size, Image.ANTIALIAS)
     if palette_mode:
         palette = get_lego_palette(palette_mode)
         base_image = apply_thumbnail_effects(base_image, palette, dither)
+    if reduce_colors:
+        base_image = reduce_thumbnail_colors(base_image, reduce_colors)
     make_lego_image(base_image, brick_image).save(output_path)
 
 
 def main(image_path, output_path=None, size=None,
-         palette_mode=None, dither=False):
+         palette_mode=None, dither=False, reduce_colors=None):
     '''Legofy image or gif with brick_path mask'''
     image_path = os.path.realpath(image_path)
     if not os.path.isfile(image_path):
@@ -159,7 +188,7 @@ def main(image_path, output_path=None, size=None,
     brick_image = Image.open(brick_path)
 
     if palette_mode:
-        print ("LEGO Palette {0} selected...".format(palette_mode.title()))
+        print("LEGO Palette {0} selected...".format(palette_mode.title()))
     elif dither:
         palette_mode = 'all'
 
@@ -172,8 +201,12 @@ def main(image_path, output_path=None, size=None,
         if output_path is None:
             output_path = get_new_filename(image_path, '.png')
         print("Static image detected, will now legofy to {0}".format(output_path))
-        legofy_image(base_image, brick_image, output_path, size, palette_mode, dither)
+        legofy_image(base_image, brick_image, output_path, size, palette_mode, dither, reduce_colors=3)
 
     base_image.close()
     brick_image.close()
     print("Finished!")
+
+
+if __name__ == '__main__':
+    main('/Users/CYu/Downloads/world-hands.png')
